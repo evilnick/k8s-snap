@@ -135,7 +135,6 @@ such as connectivity with an external `etcd` datastore and the sharing of observ
 [`Canonical Observability Stack (COS)`][COS docs]. This modular and integrated approach facilitates
 a robust and flexible Canonical Kubernetes deployment managed through Juju.
 
-
 <!-- LINKS -->
 [C4 model]:           https://c4model.com/
 [K8s charm]:          https://charmhub.io/k8s

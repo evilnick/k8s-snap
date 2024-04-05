@@ -34,6 +34,10 @@ wget https://raw.githubusercontent.com/canonical/k8s-snap/main/tests/integration
 
 ```{note} For an explanation of the settings in this file, [see below](explain-rules)
 ```
+<!-- markdownlint-restore -->
+
+```{note} For an explanation of the settings in this file, [see below](explain-rules)
+```
 
 To pipe the content of the file into the k8s LXD profile, run:
 
