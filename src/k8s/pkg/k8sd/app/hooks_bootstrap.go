@@ -10,16 +10,13 @@ import (
 	"net"
 	"net/http"
 	"path"
-	"time"
 
 	apiv1 "github.com/canonical/k8s/api/v1"
 	"github.com/canonical/k8s/pkg/component"
-	"github.com/canonical/k8s/pkg/k8sd/api/impl"
 	"github.com/canonical/k8s/pkg/k8sd/database"
 	"github.com/canonical/k8s/pkg/k8sd/pki"
 	"github.com/canonical/k8s/pkg/k8sd/setup"
 	"github.com/canonical/k8s/pkg/k8sd/types"
-	"github.com/canonical/k8s/pkg/snap"
 	snaputil "github.com/canonical/k8s/pkg/snap/util"
 	"github.com/canonical/k8s/pkg/utils"
 	"github.com/canonical/k8s/pkg/utils/k8s"
@@ -29,15 +26,17 @@ import (
 
 // onBootstrap is called after we bootstrap the first cluster node.
 // onBootstrap configures local services then writes the cluster config on the database.
-func onBootstrap(s *state.State, initConfig map[string]string) error {
+func (a *App) onBootstrap(s *state.State, initConfig map[string]string) error {
 	if workerToken, ok := initConfig["workerToken"]; ok {
-		return onBootstrapWorkerNode(s, workerToken)
+		return a.onBootstrapWorkerNode(s, workerToken)
 	}
 
-	return onBootstrapControlPlane(s, initConfig)
+	return a.onBootstrapControlPlane(s, initConfig)
 }
 
-func onBootstrapWorkerNode(s *state.State, encodedToken string) error {
+func (a *App) onBootstrapWorkerNode(s *state.State, encodedToken string) error {
+	snap := a.Snap()
+
 	token := &types.InternalWorkerNodeToken{}
 	if err := token.Decode(encodedToken); err != nil {
 		return fmt.Errorf("failed to parse worker token: %w", err)
@@ -52,10 +51,8 @@ func onBootstrapWorkerNode(s *state.State, encodedToken string) error {
 	}
 
 	// TODO(neoaggelos): figure out how to use the microcluster client instead
-
 	// create an HTTP client that ignores https
 	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
@@ -94,8 +91,6 @@ func onBootstrapWorkerNode(s *state.State, encodedToken string) error {
 	}
 	response := wrappedResp.Metadata
 
-	snap := snap.SnapFromContext(s.Context)
-
 	// Create directories
 	if err := setup.EnsureAllDirectories(snap); err != nil {
 		return fmt.Errorf("failed to create directories: %w", err)
@@ -108,10 +103,10 @@ func onBootstrapWorkerNode(s *state.State, encodedToken string) error {
 		KubeletKey:  response.KubeletKey,
 	}
 	if err := certificates.CompleteCertificates(); err != nil {
-		return fmt.Errorf("failed to initialize cluster certificates: %w", err)
+		return fmt.Errorf("failed to initialize worker node certificates: %w", err)
 	}
 	if err := setup.EnsureWorkerPKI(snap, certificates); err != nil {
-		return fmt.Errorf("failed to write cluster certificates: %w", err)
+		return fmt.Errorf("failed to write worker node certificates: %w", err)
 	}
 
 	// Kubeconfigs
@@ -149,8 +144,8 @@ func onBootstrapWorkerNode(s *state.State, encodedToken string) error {
 	return nil
 }
 
-func onBootstrapControlPlane(s *state.State, initConfig map[string]string) error {
-	snap := snap.SnapFromContext(s.Context)
+func (a *App) onBootstrapControlPlane(s *state.State, initConfig map[string]string) error {
+	snap := a.Snap()
 
 	bootstrapConfig, err := apiv1.BootstrapConfigFromMap(initConfig)
 	if err != nil {
@@ -174,12 +169,12 @@ func onBootstrapControlPlane(s *state.State, initConfig map[string]string) error
 	}
 
 	// cfg.Network.ServiceCIDR may be "IPv4CIDR[,IPv6CIDR]". get the first ip from CIDR(s).
-	serviceIPs, err := utils.GetKubernetesServiceIPsFromServiceCIDRs(cfg.Network.ServiceCIDR)
+	serviceIPs, err := utils.GetKubernetesServiceIPsFromServiceCIDRs(cfg.Network.GetServiceCIDR())
 	if err != nil {
-		return fmt.Errorf("failed to get IP address(es) from ServiceCIDR %q: %w", cfg.Network.ServiceCIDR, err)
+		return fmt.Errorf("failed to get IP address(es) from ServiceCIDR %q: %w", cfg.Network.GetServiceCIDR(), err)
 	}
 
-	switch cfg.APIServer.Datastore {
+	switch cfg.Datastore.GetType() {
 	case "k8s-dqlite":
 		certificates := pki.NewK8sDqlitePKI(pki.K8sDqlitePKIOpts{
 			Hostname:          s.Name(),
@@ -188,110 +183,83 @@ func onBootstrapControlPlane(s *state.State, initConfig map[string]string) error
 			AllowSelfSignedCA: true,
 		})
 		if err := certificates.CompleteCertificates(); err != nil {
-			return fmt.Errorf("failed to initialize cluster certificates: %w", err)
+			return fmt.Errorf("failed to initialize k8s-dqlite certificates: %w", err)
 		}
 		if err := setup.EnsureK8sDqlitePKI(snap, certificates); err != nil {
-			return fmt.Errorf("failed to write cluster certificates: %w", err)
+			return fmt.Errorf("failed to write k8s-dqlite certificates: %w", err)
 		}
 
-		cfg.Certificates.K8sDqliteCert = certificates.K8sDqliteCert
-		cfg.Certificates.K8sDqliteKey = certificates.K8sDqliteKey
+		cfg.Datastore.K8sDqliteCert = vals.Pointer(certificates.K8sDqliteCert)
+		cfg.Datastore.K8sDqliteKey = vals.Pointer(certificates.K8sDqliteKey)
 	case "external":
 		certificates := &pki.ExternalDatastorePKI{
-			DatastoreCACert:     cfg.Certificates.DatastoreCACert,
-			DatastoreClientCert: cfg.Certificates.DatastoreClientCert,
-			DatastoreClientKey:  cfg.Certificates.DatastoreClientKey,
+			DatastoreCACert:     cfg.Datastore.GetExternalCACert(),
+			DatastoreClientCert: cfg.Datastore.GetExternalClientCert(),
+			DatastoreClientKey:  cfg.Datastore.GetExternalClientKey(),
 		}
 		if err := certificates.CheckCertificates(); err != nil {
-			return fmt.Errorf("failed to initialize cluster certificates: %w", err)
+			return fmt.Errorf("failed to initialize external datastore certificates: %w", err)
 		}
 		if err := setup.EnsureExtDatastorePKI(snap, certificates); err != nil {
-			return fmt.Errorf("failed to write cluster certificates: %w", err)
+			return fmt.Errorf("failed to write external datastore certificates: %w", err)
 		}
 	default:
-		return fmt.Errorf("unsupported datastore %s, must be one of %v", cfg.APIServer.Datastore, setup.SupportedDatastores)
+		return fmt.Errorf("unsupported datastore %s, must be one of %v", cfg.Datastore.GetType(), setup.SupportedDatastores)
 	}
+
+	extraIPs, extraNames := utils.SplitIPAndDNSSANs(bootstrapConfig.ExtraSANs)
+
+	IPSANs := append(append([]net.IP{nodeIP}, serviceIPs...), extraIPs...)
 
 	// Certificates
 	certificates := pki.NewControlPlanePKI(pki.ControlPlanePKIOpts{
 		Hostname:                  s.Name(),
-		IPSANs:                    append([]net.IP{nodeIP}, serviceIPs...),
+		IPSANs:                    IPSANs,
+		DNSSANs:                   extraNames,
 		Years:                     20,
 		AllowSelfSignedCA:         true,
 		IncludeMachineAddressSANs: true,
 	})
 	if err := certificates.CompleteCertificates(); err != nil {
-		return fmt.Errorf("failed to initialize cluster certificates: %w", err)
+		return fmt.Errorf("failed to initialize control plane certificates: %w", err)
 	}
 	if err := setup.EnsureControlPlanePKI(snap, certificates); err != nil {
-		return fmt.Errorf("failed to write cluster certificates: %w", err)
+		return fmt.Errorf("failed to write control plane certificates: %w", err)
 	}
 
 	// Add certificates to the cluster config
-	cfg.Certificates.CACert = certificates.CACert
-	cfg.Certificates.CAKey = certificates.CAKey
-	cfg.Certificates.FrontProxyCACert = certificates.FrontProxyCACert
-	cfg.Certificates.FrontProxyCAKey = certificates.FrontProxyCAKey
-	cfg.Certificates.APIServerKubeletClientCert = certificates.APIServerKubeletClientCert
-	cfg.Certificates.APIServerKubeletClientKey = certificates.APIServerKubeletClientKey
-	cfg.APIServer.ServiceAccountKey = certificates.ServiceAccountKey
+	cfg.Certificates.CACert = vals.Pointer(certificates.CACert)
+	cfg.Certificates.CAKey = vals.Pointer(certificates.CAKey)
+	cfg.Certificates.FrontProxyCACert = vals.Pointer(certificates.FrontProxyCACert)
+	cfg.Certificates.FrontProxyCAKey = vals.Pointer(certificates.FrontProxyCAKey)
+	cfg.Certificates.APIServerKubeletClientCert = vals.Pointer(certificates.APIServerKubeletClientCert)
+	cfg.Certificates.APIServerKubeletClientKey = vals.Pointer(certificates.APIServerKubeletClientKey)
+	cfg.Certificates.ServiceAccountKey = vals.Pointer(certificates.ServiceAccountKey)
 
 	// Generate kubeconfigs
-	for _, kubeconfig := range []struct {
-		file     string
-		username string
-		groups   []string
-	}{
-		{file: "admin.conf", username: "kubernetes-admin", groups: []string{"system:masters"}},
-		{file: "controller.conf", username: "system:kube-controller-manager"},
-		{file: "proxy.conf", username: "system:kube-proxy"},
-		{file: "scheduler.conf", username: "system:kube-scheduler"},
-		{file: "kubelet.conf", username: fmt.Sprintf("system:node:%s", s.Name()), groups: []string{"system:nodes"}},
-	} {
-		token, err := impl.GetOrCreateAuthToken(s.Context, s, kubeconfig.username, kubeconfig.groups)
-		if err != nil {
-			return fmt.Errorf("failed to generate token for username=%s groups=%v: %w", kubeconfig.username, kubeconfig.groups, err)
-		}
-		if err := setup.Kubeconfig(path.Join(snap.KubernetesConfigDir(), kubeconfig.file), token, fmt.Sprintf("127.0.0.1:%d", cfg.APIServer.SecurePort), cfg.Certificates.CACert); err != nil {
-			return fmt.Errorf("failed to write kubeconfig %s: %w", kubeconfig.file, err)
-		}
+	if err := setupKubeconfigs(s, snap.KubernetesConfigDir(), cfg.APIServer.GetSecurePort(), cfg.Certificates.GetCACert()); err != nil {
+		return fmt.Errorf("failed to generate kubeconfigs: %w", err)
 	}
 
 	// Configure datastore
-	switch cfg.APIServer.Datastore {
+	switch cfg.Datastore.GetType() {
 	case "k8s-dqlite":
-		if err := setup.K8sDqlite(snap, fmt.Sprintf("%s:%d", nodeIP.String(), cfg.K8sDqlite.Port), nil); err != nil {
+		if err := setup.K8sDqlite(snap, fmt.Sprintf("%s:%d", nodeIP.String(), cfg.Datastore.GetK8sDqlitePort()), nil); err != nil {
 			return fmt.Errorf("failed to configure k8s-dqlite: %w", err)
 		}
 	case "external":
 	default:
-		return fmt.Errorf("unsupported datastore %s, must be one of %v", cfg.APIServer.Datastore, setup.SupportedDatastores)
+		return fmt.Errorf("unsupported datastore %s, must be one of %v", cfg.Datastore.GetType(), setup.SupportedDatastores)
 	}
 
 	// Configure services
-	if err := setup.Containerd(snap, nil); err != nil {
-		return fmt.Errorf("failed to configure containerd: %w", err)
-	}
-	if err := setup.KubeletControlPlane(snap, s.Name(), nodeIP, cfg.Kubelet.ClusterDNS, cfg.Kubelet.ClusterDomain, cfg.Kubelet.CloudProvider); err != nil {
-		return fmt.Errorf("failed to configure kubelet: %w", err)
-	}
-	if err := setup.KubeProxy(s.Context, snap, s.Name(), cfg.Network.PodCIDR); err != nil {
-		return fmt.Errorf("failed to configure kube-proxy: %w", err)
-	}
-	if err := setup.KubeControllerManager(snap); err != nil {
-		return fmt.Errorf("failed to configure kube-controller-manager: %w", err)
-	}
-	if err := setup.KubeScheduler(snap); err != nil {
-		return fmt.Errorf("failed to configure kube-scheduler: %w", err)
-	}
-
-	if err := setup.KubeAPIServer(snap, cfg.Network.ServiceCIDR, s.Address().Path("1.0", "kubernetes", "auth", "webhook").String(), true, cfg.APIServer.Datastore, cfg.APIServer.DatastoreURL, cfg.APIServer.AuthorizationMode); err != nil {
-		return fmt.Errorf("failed to configure kube-apiserver: %w", err)
+	if err := setupControlPlaneServices(snap, s, cfg, nodeIP); err != nil {
+		return fmt.Errorf("failed to configure services: %w", err)
 	}
 
 	// Write cluster configuration to dqlite
 	if err := s.Database.Transaction(s.Context, func(ctx context.Context, tx *sql.Tx) error {
-		if err := database.SetClusterConfig(ctx, tx, cfg); err != nil {
+		if _, err := database.SetClusterConfig(ctx, tx, cfg); err != nil {
 			return fmt.Errorf("failed to write cluster configuration: %w", err)
 		}
 		return nil
@@ -300,87 +268,86 @@ func onBootstrapControlPlane(s *state.State, initConfig map[string]string) error
 	}
 
 	// Start services
-	switch cfg.APIServer.Datastore {
-	case "k8s-dqlite":
-		if err := snaputil.StartK8sDqliteServices(s.Context, snap); err != nil {
-			return fmt.Errorf("failed to start control plane services: %w", err)
-		}
-	case "external":
-	default:
-		return fmt.Errorf("unsupported datastore %s, must be one of %v", cfg.APIServer.Datastore, setup.SupportedDatastores)
+	if err := startControlPlaneServices(s.Context, snap, cfg.Datastore.GetType()); err != nil {
+		return fmt.Errorf("failed to start services: %w", err)
 	}
 
-	if err := snaputil.StartControlPlaneServices(s.Context, snap); err != nil {
-		return fmt.Errorf("failed to start control plane services: %w", err)
-	}
-
-	// Wait for API server to come up
-	client, err := k8s.NewClient(snap)
-	if err != nil {
-		return fmt.Errorf("failed to create k8s client: %w", err)
-	}
-
-	if err := client.WaitApiServerReady(s.Context); err != nil {
+	// Wait until Kube-API server is ready
+	if err := waitApiServerReady(s.Context, snap); err != nil {
 		return fmt.Errorf("kube-apiserver did not become ready in time: %w", err)
 	}
 
-	if cfg.Network.Enabled != nil {
-		err := component.ReconcileNetworkComponent(s.Context, snap, vals.Pointer(false), cfg.Network.Enabled, cfg)
-		if err != nil {
+	// TODO(neoaggelos): the work below should be a POST /cluster/config
+
+	if cfg.Network.GetEnabled() {
+		if err := component.ReconcileNetworkComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile network: %w", err)
 		}
 	}
 
-	if cfg.DNS.Enabled != nil {
-		dnsIP, _, err := component.ReconcileDNSComponent(s.Context, snap, vals.Pointer(false), cfg.DNS.Enabled, cfg)
+	if cfg.DNS.GetEnabled() {
+		dnsIP, _, err := component.ReconcileDNSComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg)
 		if err != nil {
 			return fmt.Errorf("failed to reconcile dns: %w", err)
 		}
-		if err := s.Database.Transaction(s.Context, func(ctx context.Context, tx *sql.Tx) error {
-			if err := database.SetClusterConfig(ctx, tx, types.ClusterConfig{
-				Kubelet: types.Kubelet{
-					ClusterDNS: dnsIP,
-				},
+
+		// If DNS IP is not empty, update cluster configuration
+		if dnsIP != "" {
+			if err := s.Database.Transaction(s.Context, func(ctx context.Context, tx *sql.Tx) error {
+				if cfg, err = database.SetClusterConfig(ctx, tx, types.ClusterConfig{
+					Kubelet: types.Kubelet{
+						ClusterDNS: vals.Pointer(dnsIP),
+					},
+				}); err != nil {
+					return fmt.Errorf("failed to update cluster configuration for dns=%s: %w", dnsIP, err)
+				}
+				return nil
 			}); err != nil {
-				return fmt.Errorf("failed to update cluster configuration for dns=%s: %w", dnsIP, err)
+				return fmt.Errorf("database transaction to update cluster configuration failed: %w", err)
 			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("database transaction to update cluster configuration failed: %w", err)
 		}
 	}
 
-	if cfg.LocalStorage.Enabled != nil {
-		err := component.ReconcileLocalStorageComponent(s.Context, snap, vals.Pointer(false), cfg.LocalStorage.Enabled, cfg)
-		if err != nil {
+	cmData, err := cfg.Kubelet.ToConfigMap()
+	if err != nil {
+		return fmt.Errorf("failed to format kubelet configmap data: %w", err)
+	}
+
+	client, err := k8s.NewClient(snap.KubernetesRESTClientGetter(""))
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	if _, err := client.UpdateConfigMap(s.Context, "kube-system", "k8sd-config", cmData); err != nil {
+		return fmt.Errorf("failed to update node configs: %w", err)
+	}
+
+	if cfg.LocalStorage.GetEnabled() {
+		if err := component.ReconcileLocalStorageComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile local-storage: %w", err)
 		}
 	}
 
-	if cfg.Gateway.Enabled != nil {
-		err := component.ReconcileGatewayComponent(s.Context, snap, vals.Pointer(false), cfg.Gateway.Enabled, cfg)
-		if err != nil {
+	if cfg.Gateway.GetEnabled() {
+		if err := component.ReconcileGatewayComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile gateway: %w", err)
 		}
 	}
 
-	if cfg.Ingress.Enabled != nil {
-		err := component.ReconcileIngressComponent(s.Context, snap, vals.Pointer(false), cfg.Ingress.Enabled, cfg)
-		if err != nil {
+	if cfg.Ingress.GetEnabled() {
+		if err := component.ReconcileIngressComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile ingress: %w", err)
 		}
 	}
 
-	if cfg.LoadBalancer.Enabled != nil {
-		err := component.ReconcileLoadBalancerComponent(s.Context, snap, vals.Pointer(false), cfg.LoadBalancer.Enabled, cfg)
-		if err != nil {
+	if cfg.LoadBalancer.GetEnabled() {
+		if err := component.ReconcileLoadBalancerComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile load-balancer: %w", err)
 		}
 	}
 
-	if cfg.MetricsServer.Enabled != nil {
-		err := component.ReconcileMetricsServerComponent(s.Context, snap, vals.Pointer(false), cfg.MetricsServer.Enabled, cfg)
-		if err != nil {
+	if cfg.MetricsServer.GetEnabled() {
+		if err := component.ReconcileMetricsServerComponent(s.Context, snap, vals.Pointer(false), vals.Pointer(true), cfg); err != nil {
 			return fmt.Errorf("failed to reconcile metrics-server: %w", err)
 		}
 	}

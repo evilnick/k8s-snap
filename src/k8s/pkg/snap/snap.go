@@ -10,6 +10,7 @@ import (
 	"github.com/canonical/k8s/pkg/client/dqlite"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/utils"
+	"github.com/canonical/k8s/pkg/utils/vals"
 	"github.com/moby/sys/mountinfo"
 	"gopkg.in/yaml.v2"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -195,7 +196,7 @@ func (s *snap) Components() map[string]types.Component {
 	return map[string]types.Component{
 		"network": {
 			ReleaseName:  "ck-network",
-			ManifestPath: path.Join(s.snapDir, "k8s", "components", "charts", "cilium-1.14.1.tgz"),
+			ManifestPath: path.Join(s.snapDir, "k8s", "components", "charts", "cilium-1.15.2.tgz"),
 			Namespace:    "kube-system",
 		},
 		"dns": {
@@ -212,7 +213,7 @@ func (s *snap) Components() map[string]types.Component {
 		"ingress": {},
 		"gateway": {
 			ReleaseName:  "ck-gateway",
-			ManifestPath: path.Join(s.snapDir, "k8s", "components", "charts", "gateway-api-0.7.1.tgz"),
+			ManifestPath: path.Join(s.snapDir, "k8s", "components", "charts", "gateway-api-1.0.0.tgz"),
 			Namespace:    "kube-system",
 		},
 		"load-balancer": {
@@ -231,6 +232,16 @@ func (s *snap) Components() map[string]types.Component {
 func (s *snap) KubernetesRESTClientGetter(namespace string) genericclioptions.RESTClientGetter {
 	flags := &genericclioptions.ConfigFlags{
 		KubeConfig: &[]string{"/etc/kubernetes/admin.conf"}[0],
+	}
+	if namespace != "" {
+		flags.Namespace = &namespace
+	}
+	return flags
+}
+
+func (s *snap) KubernetesNodeRESTClientGetter(namespace string) genericclioptions.RESTClientGetter {
+	flags := &genericclioptions.ConfigFlags{
+		KubeConfig: vals.Pointer(path.Join(s.KubernetesConfigDir(), "kubelet.conf")),
 	}
 	if namespace != "" {
 		flags.Namespace = &namespace

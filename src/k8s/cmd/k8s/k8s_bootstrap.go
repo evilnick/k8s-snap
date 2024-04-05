@@ -44,7 +44,7 @@ func newBootstrapCmd(env cmdutil.ExecutionEnvironment) *cobra.Command {
 		PreRun: chainPreRunHooks(hookRequireRoot(env)),
 		Run: func(cmd *cobra.Command, args []string) {
 			if opts.interactive && opts.configFile != "" {
-				cmd.PrintErrln("Error: --interactive and --config flags cannot be set at the same time.")
+				cmd.PrintErrln("Error: --interactive and --file flags cannot be set at the same time.")
 				env.Exit(1)
 				return
 			}
@@ -64,8 +64,9 @@ func newBootstrapCmd(env cmdutil.ExecutionEnvironment) *cobra.Command {
 			}
 
 			if opts.address == "" {
-				opts.address = util.CanonicalNetworkAddress(util.NetworkInterfaceAddress(), config.DefaultPort)
+				opts.address = util.NetworkInterfaceAddress()
 			}
+			opts.address = util.CanonicalNetworkAddress(opts.address, config.DefaultPort)
 
 			client, err := env.Client(cmd.Context())
 			if err != nil {
@@ -96,7 +97,14 @@ func newBootstrapCmd(env cmdutil.ExecutionEnvironment) *cobra.Command {
 			}
 
 			cmd.PrintErrln("Bootstrapping the cluster. This may take a few seconds, please wait.")
-			node, err := client.Bootstrap(cmd.Context(), opts.name, opts.address, bootstrapConfig)
+
+			request := apiv1.PostClusterBootstrapRequest{
+				Name:    opts.name,
+				Address: opts.address,
+				Config:  bootstrapConfig,
+			}
+
+			node, err := client.Bootstrap(cmd.Context(), request)
 			if err != nil {
 				cmd.PrintErrf("Error: Failed to bootstrap the cluster.\n\nThe error was: %v\n", err)
 				env.Exit(1)
@@ -110,9 +118,10 @@ func newBootstrapCmd(env cmdutil.ExecutionEnvironment) *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolVar(&opts.interactive, "interactive", false, "interactively configure the most important cluster options")
-	cmd.PersistentFlags().StringVar(&opts.configFile, "config", "", "path to the YAML file containing your custom cluster bootstrap configuration.")
+	cmd.PersistentFlags().StringVar(&opts.configFile, "file", "", "path to the YAML file containing your custom cluster bootstrap configuration.")
 	cmd.Flags().StringVar(&opts.name, "name", "", "node name, defaults to hostname")
 	cmd.Flags().StringVar(&opts.address, "address", "", "microcluster address, defaults to the node IP address")
+
 	return cmd
 }
 

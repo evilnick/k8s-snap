@@ -28,7 +28,11 @@ Get our pre-defined profile rules from GitHub and save them as `k8s.profile`.
 
 <!-- markdownlint-disable -->
 ```
-wget https://raw.githubusercontent.com/canonical/k8s-snap/main/tests/e2e/lxd-profile.yaml -O k8s.profile
+wget https://raw.githubusercontent.com/canonical/k8s-snap/main/tests/integration/lxd-profile.yaml -O k8s.profile
+```
+<!-- markdownlint-restore -->
+
+```{note} For an explanation of the settings in this file, [see below](explain-rules)
 ```
 <!-- markdownlint-restore -->
 
