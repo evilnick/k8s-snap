@@ -7,7 +7,6 @@ functional cluster, additional services and features are built in. You can
 deploy the snap and have a single-node cluster up and running in minutes.
 
 ## Why a snap?
-
 Snaps are self-contained, simple to install, secure, cross-platform, and
 dependency-free. They can be installed on any Linux system which supports the
 `snapd` service (see the [snapd documentation] for more information). Security
@@ -22,10 +21,10 @@ In addition to the upstream Kubernetes services, Canonical Kubernetes also inclu
 - a DNS service for the node
 - a CNI for the node/cluster
 - a simple storage provider
-- an ingress provider
+ - an ingress provider
 - a load-balancer
 - a gateway API controller
-- a metrics server
+-  a metrics server
 
 ## Where can I install it?
 
