@@ -6,6 +6,10 @@ upstream Kubernetes services are not all that is required for a fully
 functional cluster, additional services and features are built in. You can
 deploy the snap and have a single-node cluster up and running in minutes.
 
+
+
+
+ fdfdsfdsfdf
 ## Why a snap?
 
 
