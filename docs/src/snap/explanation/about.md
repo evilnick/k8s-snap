@@ -7,6 +7,7 @@ functional cluster, additional services and features are built in. You can
 deploy the snap and have a single-node cluster up and running in minutes.
 
 
+
 ## Why a snap?
 
 Snaps are self-contained, simple to install, secure, cross-platform, and
@@ -17,7 +18,8 @@ maintain and easy to upgrade.
 
 ## What else comes with it?
 
-In addition to the upstream Kubernetes services, Canonical Kubernetes also includes:
+In addition to the upstream Kubernetes services, Canonical Kubernetes also
+includes:
 
 - a DNS service for the node
 - a CNI for the node/cluster
