@@ -16,7 +16,7 @@ dependency-free. They can be installed on any Linux system which supports the
 and robustness are their key features, alongside being easy to install, easy to
 maintain and easy to upgrade.
 
-## What else comes with it?
+## What else comes with it?.
 
 In addition to the upstream Kubernetes services, Canonical Kubernetes also
 includes:
