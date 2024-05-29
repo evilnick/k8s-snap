@@ -8,6 +8,9 @@ deploy the snap and have a single-node cluster up and running in minutes.
 
 ## Why a snap?
 
+
+
+
 Snaps are self-contained, simple to install, secure, cross-platform, and
 dependency-free. They can be installed on any Linux system which supports the
 `snapd` service (see the [snapd documentation] for more information). Security
