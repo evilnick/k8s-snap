@@ -7,13 +7,7 @@ functional cluster, additional services and features are built in. You can
 deploy the snap and have a single-node cluster up and running in minutes.
 
 
-
-
- fdfdsfdsfdf
 ## Why a snap?
-
-
-
 
 Snaps are self-contained, simple to install, secure, cross-platform, and
 dependency-free. They can be installed on any Linux system which supports the
