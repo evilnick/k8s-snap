@@ -61,7 +61,8 @@ visit the [Ubuntu support] page.
 [tutorial]: ../tutorial/getting-started
 [Juju]: https://juju.is
 [charm]: https://charmhub.io/k8s
-[snapd documentation]: https://snapcraft.io/docs/installing-snapd
-[Community page]: ../reference/community
+[snapd documentation]: https://snapcraft.io/docs/installing-snapd/jfdfdsfdsfs/fdsfdsfdsfds/fdfdsfdfdsfdsfd/fdffdfdfdf/fdfds
+[Community page]: ../reference/community/
+plop/kidffdfdfd/fdfdfdfdfdfdf
 [Ubuntu Pro]:  https://ubuntu.com/pro
 [Ubuntu support]: https://ubuntu.com/support
