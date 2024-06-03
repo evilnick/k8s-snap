@@ -47,8 +47,7 @@ Highly Available.
 Each and every user will be supported by the community. For a more detailed
 look at what that entails, please see our [Community page]. If you need a
 greater level of support, Canonical provides [Ubuntu Pro], a comprehensive
-subscription for your open-source software stack. For more support options,
-visit the [Ubuntu support] page.
+subscription for your open-source software stack. For more support options, visit the [Ubuntu support] page.
 
 ## Next steps
 
