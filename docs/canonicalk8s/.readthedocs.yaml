@@ -23,8 +23,7 @@ build:
           exit 183;
         fi
         ls
-    pre_build:
-      - |
+    - |
         cd docs/canonicalk8s/
         make install
       
@@ -38,9 +37,9 @@ formats:
    - pdf
 
 # Optionally declare the Python requirements required to build your docs
-# python:
-#    install:
-#    - requirements: docs/canonicalk8s/.sphinx/requirements.txt
+python:
+   install:
+   - requirements: docs/canonicalk8s/.sphinx/requirements.txt
 
 
 
