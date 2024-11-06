@@ -167,6 +167,7 @@ custom_extensions = [
     'canonical.terminal-output',
     'notfound.extension',
     'sphinxcontrib.cairosvgconverter', 
+    'sphinxcontrib.kroki',
     ]
 
 # Add custom required Python modules that must be added to the
