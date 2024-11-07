@@ -28,7 +28,7 @@ build:
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   builder: dirhtml
-  configuration: docs/canonicalk8s/conf.py
+  configuration: docs/canonicalk8s/conf-rtd.py
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 # formats:
