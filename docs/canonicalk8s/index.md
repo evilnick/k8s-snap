@@ -57,7 +57,7 @@ src/capi/reference/index
 
 ```{grid-item-card}
 :link: src/snap/
-### [Install K8s from a snap ›](snap/index)
+### [Install K8s from a snap ›](src/snap/index)
 ^^^
 Our tutorials, How To guides and other pages will explain how to install,
  configure and use the {{product}} 'k8s' snap.
@@ -65,7 +65,7 @@ Our tutorials, How To guides and other pages will explain how to install,
 
 ```{grid-item-card}
 :link: src/charm/
-### [Deploy K8s using Juju ›](charm/index)
+### [Deploy K8s using Juju ›](src/charm/index)
 ^^^
 Our tutorials, How To guides and other pages will explain how to install,
  configure and use the {{product}} 'k8s' charm.
@@ -74,7 +74,7 @@ Our tutorials, How To guides and other pages will explain how to install,
 
 ```{grid-item-card}
 :link: src/capi/
-### [Deploy K8s using Cluster API ›](capi/index)
+### [Deploy K8s using Cluster API ›](src/capi/index)
 ^^^
 Our tutorials, guides and explanation pages will explain how to install,
  configure and use {{product}} through CAPI.

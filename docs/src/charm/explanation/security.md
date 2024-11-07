@@ -1,4 +1,4 @@
 # Security
 
-```{include} /snap/explanation/security.md
+```{include} ../../snap/explanation/security.md
 ```

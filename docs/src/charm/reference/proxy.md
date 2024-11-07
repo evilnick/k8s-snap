@@ -1,4 +1,4 @@
 # Proxies
 
-```{include} /snap/reference/proxy.md
+```{include} ../../snap/reference/proxy.md
 ```
